@@ -3518,11 +3518,20 @@ function App() {
         }
       });
     });
+    // theoretical weight per pc (MT) = thick(mm) x width(mm) x length(mm) x 7.85 / 1e9
+    const STEEL_DENSITY = 7.85;
+    const theoWtPerPc = (inRec, size) => {
+      const t = inRec ? Number(inRec.thickness) : 0;
+      const w = inRec ? Number(inRec.width) : 0;
+      const l = Number(String(size).replace(/,/g, "").trim());
+      return t > 0 && w > 0 && l > 0 ? t * w * l * STEEL_DENSITY / 1e9 : undefined;
+    };
     const inD = stockIn.filter(r => civilDateKeyOf(r.date) === reportDate);
     const cutD = stockCutting.filter(r => civilDateKeyOf(r.date) === reportDate).map(r => {
       const inRec = inLookup.get(r.coilKey) || null;
       const wtMap = cutterWtByCoilSize.get(r.coilKey);
-      const avgWtPerPc = wtMap ? wtMap.get(String(r.cuttingSize).trim()) : undefined;
+      const theoWt = theoWtPerPc(inRec, r.cuttingSize);
+      const avgWtPerPc = theoWt !== undefined ? theoWt : wtMap ? wtMap.get(String(r.cuttingSize).trim()) : undefined;
       return {
         ...r,
         grade: inRec ? inRec.grade : "",
@@ -3543,7 +3552,8 @@ function App() {
       const inRec = inLookup.get(r.coilKey) || null;
       // CUTTER register ka avg wt/pc -> expected weight vs actual dispatched weight (short/excess)
       const wtMapOut = cutterWtByCoilSize.get(r.coilKey);
-      const cutterWtPc = wtMapOut ? wtMapOut.get(String(r.cuttingSize).trim()) : undefined;
+      const theoWtOut = theoWtPerPc(inRec, r.cuttingSize);
+      const cutterWtPc = theoWtOut !== undefined ? theoWtOut : wtMapOut ? wtMapOut.get(String(r.cuttingSize).trim()) : undefined;
       const avgWtPerPc = cutterWtPc !== undefined ? cutterWtPc : null;
       const expectedWt = avgWtPerPc !== null ? avgWtPerPc * r.pcs : null;
       const diffWt = expectedWt !== null ? r.receivedWeight - expectedWt : null; // + excess, - short
